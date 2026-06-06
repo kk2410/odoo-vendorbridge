@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% block title %}Approvals Dashboard – VendorBridge ERP{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h4 class="fw-bold mb-0 text-slate-blue"><i class="fa-solid fa-circle-check me-2"></i>Approvals & Workflow Management</h4>
+</div>
+
+<div class="row g-4">
+    <!-- Pending Approvals -->
+    <div class="col-lg-8">
+        <div class="card card-glass border-0 p-4 bg-white mb-4">
+            <h5 class="fw-bold text-slate-blue mb-4 border-bottom pb-3">Pending Requests ({{ approvals.count }})</h5>
+            
+            {% for app in approvals %}
+            <!-- Find the shortlisted quote for this RFQ -->
+            {% with shortlisted_quote=app.rfq.quotations.filter.first %}
+            <div class="border rounded p-4 mb-4 bg-light">
+                <div class="d-flex justify-content-between align-items-start flex-wrap mb-3 border-bottom pb-2">
+                    <div>
+                        <h6 class="fw-bold mb-1 text-slate-blue">RFQ: {{ app.rfq.rfq_number }} - {{ app.rfq.title }}</h6>
+                        <small class="text-muted">Product: <strong>{{ app.rfq.product_name }}</strong> | Qty: <strong>{{ app.rfq.quantity }}</strong></small>
+                    </div>
+                    <div>
+                        <span class="badge bg-warning text-dark px-2.5 py-1.5 rounded">Pending Approval</span>
+                    </div>
+                </div>
+
+                <div class="row g-3 fs-13 mb-3">
+                    <div class="col-md-6">
+                        <p class="mb-1 text-secondary"><strong>Shortlisted Vendor:</strong> {{ shortlisted_quote.vendor.company_name|default:"Not selected" }}</p>
+                        <p class="mb-1 text-secondary"><strong>Offered Price:</strong> INR {{ shortlisted_quote.price|default:"-"|floatformat:2 }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1 text-secondary"><strong>Delivery Timeline:</strong> {{ shortlisted_quote.delivery_timeline }} days</p>
+                        <p class="mb-1 text-secondary"><strong>Requested By:</strong> {{ app.rfq.created_by.username }}</p>
+                    </div>
+                </div>
+
+                <!-- Action form -->
+                <form method="POST" action="{% url 'approvals:approve_rfq' app.pk %}" class="mt-3">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <input type="text" name="remarks" class="form-control form-control-sm bg-white" placeholder="Enter approval remarks/notes..." required>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-sm btn-success px-4 rounded-pill">Approve</button>
+                        <button type="submit" formmethod="POST" formaction="{% url 'approvals:reject_rfq' app.pk %}" class="btn btn-sm btn-danger px-4 rounded-pill">Reject</button>
+                        <a href="{% url 'rfq:rfq_detail' app.rfq.pk %}" class="btn btn-sm btn-light border px-3 rounded-pill">View RFQ Details</a>
+                    </div>
+                </form>
+            </div>
+            {% endwith %}
+            {% empty %}
+            <div class="text-center text-muted py-5">
+                <i class="fa-solid fa-square-check text-muted fs-1 mb-3"></i>
+                <h5 class="fw-bold">No Pending Approvals</h5>
+                <p class="mb-0">All clear! No pending procurement requests.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- History -->
+    <div class="col-lg-4">
+        <div class="card card-glass border-0 p-4 bg-white">
+            <h5 class="fw-bold text-slate-blue mb-4 border-bottom pb-3">Processed History</h5>
+            <div class="timeline px-2">
+                {% for hist in history %}
+                <div class="timeline-item {% if hist.status == 'approved' %}success{% else %}danger{% endif %} small">
+                    <p class="mb-0 fw-bold">{{ hist.get_status_display|upper }}</p>
+                    <p class="mb-1 text-secondary">RFQ: {{ hist.rfq.rfq_number }}</p>
+                    {% if hist.remarks %}
+                    <p class="mb-1 text-muted italic">"{{ hist.remarks }}"</p>
+                    {% endif %}
+                    <span class="fs-11 text-muted">{{ hist.action_date|date:"Y-m-d H:i" }}</span>
+                </div>
+                {% empty %}
+                <p class="text-muted text-center py-4 small">No history recorded yet.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

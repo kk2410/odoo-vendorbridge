@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Invoices – VendorBridge ERP{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h4 class="fw-bold mb-0 text-slate-blue"><i class="fa-solid fa-receipt me-2"></i>Invoices Management</h4>
+</div>
+
+<!-- Filters -->
+<div class="card card-glass border-0 p-4 mb-4 bg-white">
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'invoices:invoice_list' %}" class="btn btn-sm {% if not selected_status %}btn-dark{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">All Invoices</a>
+        {% for status_code, status_name in status_choices %}
+        <a href="{% url 'invoices:invoice_list' %}?status={{ status_code }}" class="btn btn-sm {% if selected_status == status_code %}btn-dark{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">{{ status_name }}</a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Invoices Table -->
+<div class="card card-glass border-0 p-4 bg-white">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr class="fs-12">
+                    <th>Invoice Number</th>
+                    <th>PO Reference</th>
+                    <th>Vendor Company</th>
+                    <th>Total (INR)</th>
+                    <th>GST Amount</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody class="fs-13">
+                {% for inv in invoices %}
+                <tr>
+                    <td><a href="{% url 'invoices:invoice_detail' inv.pk %}" class="fw-bold text-decoration-none text-slate-blue">{{ inv.invoice_number }}</a></td>
+                    <td>{{ inv.purchase_order.po_number }}</td>
+                    <td>{{ inv.purchase_order.vendor.company_name }}</td>
+                    <td class="fw-bold text-success">INR {{ inv.total_amount|floatformat:2 }}</td>
+                    <td>INR {{ inv.gst_amount|floatformat:2 }} ({{ inv.gst_percentage }}%)</td>
+                    <td>{{ inv.due_date|date:"Y-m-d" }}</td>
+                    <td>
+                        <span class="badge {% if inv.status == 'paid' %}badge-active{% elif inv.status == 'cancelled' %}badge-inactive{% else %}badge-pending{% endif %} px-2 py-1 rounded">
+                            {{ inv.get_status_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{% url 'invoices:invoice_detail' inv.pk %}" class="btn btn-sm btn-light border px-2.5 rounded-pill">View</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">No Invoices found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

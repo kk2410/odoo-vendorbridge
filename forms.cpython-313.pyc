@@ -1,95 +1,36 @@
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from accounts.decorators import role_required, procurement_required
-from .models import Vendor
-from .forms import VendorForm
-from analytics_app.models import log_activity
 from django.db import models
+from django.conf import settings
 
-@login_required
-@role_required(['procurement', 'manager', 'admin'])
-def vendor_list(request):
-    vendors = Vendor.objects.all()
+class Vendor(models.Model):
+    CATEGORY_CHOICES = (
+        ('it', 'IT & Software'),
+        ('office', 'Office Supplies'),
+        ('logistics', 'Logistics & Shipping'),
+        ('services', 'Professional Services'),
+        ('mfg', 'Manufacturing & Raw Materials'),
+    )
     
-    # Searching
-    q = request.GET.get('q')
-    if q:
-        vendors = vendors.filter(
-            models.Q(company_name__icontains=q) |
-            models.Q(contact_person__icontains=q) |
-            models.Q(email__icontains=q)
-        )
-        
-    # Filtering
-    category = request.GET.get('category')
-    if category:
-        vendors = vendors.filter(category=category)
-        
-    status = request.GET.get('status')
-    if status:
-        vendors = vendors.filter(status=status)
-        
-    context = {
-        'vendors': vendors,
-        'category_choices': Vendor.CATEGORY_CHOICES,
-        'status_choices': Vendor.STATUS_CHOICES,
-        'selected_category': category,
-        'selected_status': status,
-        'query': q,
-    }
-    return render(request, 'vendors/vendor_list.html', context)
+    STATUS_CHOICES = (
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+    )
 
-@login_required
-@role_required(['procurement', 'manager', 'admin', 'vendor'])
-def vendor_detail(request, pk):
-    # If the logged-in user is a vendor, they should only view their own profile
-    if request.user.role == 'vendor':
-        vendor = get_object_or_404(Vendor, user=request.user)
-        if vendor.pk != pk:
-            messages.error(request, "You are not authorized to view this vendor profile.")
-            return redirect('dashboard')
-    else:
-        vendor = get_object_or_404(Vendor, pk=pk)
-        
-    context = {'vendor': vendor}
-    return render(request, 'vendors/vendor_detail.html', context)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='vendor_profile',
+        null=True, 
+        blank=True
+    )
+    company_name = models.CharField(max_length=150, unique=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='office')
+    gst_number = models.CharField(max_length=15, unique=True)
+    contact_person = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+    phone_number = models.CharField(max_length=15)
+    address = models.TextField()
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=5.00)  # scale 0.00 to 5.00
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
 
-@login_required
-@procurement_required
-def vendor_create(request):
-    if request.method == 'POST':
-        form = VendorForm(request.POST)
-        if form.is_valid():
-            vendor = form.save()
-            messages.success(request, f"Vendor {vendor.company_name} added successfully.")
-            log_activity(request.user, 'vendor', f"Created vendor {vendor.company_name} (ID: {vendor.pk}).")
-            return redirect('vendors:vendor_list')
-    else:
-        form = VendorForm()
-    return render(request, 'vendors/vendor_form.html', {'form': form, 'action': 'Add'})
-
-@login_required
-@procurement_required
-def vendor_update(request, pk):
-    vendor = get_object_or_404(Vendor, pk=pk)
-    if request.method == 'POST':
-        form = VendorForm(request.POST, instance=vendor)
-        if form.is_valid():
-            vendor = form.save()
-            messages.success(request, f"Vendor {vendor.company_name} updated successfully.")
-            log_activity(request.user, 'vendor', f"Updated vendor {vendor.company_name} (ID: {vendor.pk}).")
-            return redirect('vendors:vendor_list')
-    else:
-        form = VendorForm(instance=vendor)
-    return render(request, 'vendors/vendor_form.html', {'form': form, 'action': 'Edit', 'vendor': vendor})
-
-@login_required
-@procurement_required
-def vendor_delete(request, pk):
-    vendor = get_object_or_404(Vendor, pk=pk)
-    company_name = vendor.company_name
-    vendor.delete()
-    messages.success(request, f"Vendor {company_name} deleted successfully.")
-    log_activity(request.user, 'vendor', f"Deleted vendor {company_name}.")
-    return redirect('vendors:vendor_list')
+    def __str__(self):
+        return f"{self.company_name} - {self.get_category_display()}"

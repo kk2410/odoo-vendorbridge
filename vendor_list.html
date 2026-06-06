@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %}Quotation Comparison – VendorBridge ERP{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'rfq:rfq_detail' rfq.pk %}" class="text-decoration-none text-slate-blue fs-14"><i class="fa-solid fa-arrow-left me-1"></i> Back to RFQ details</a>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0 text-slate-blue"><i class="fa-solid fa-code-compare me-2"></i>Quotation Comparison Tool</h4>
+    
+    <div class="dropdown">
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle rounded-pill px-3" type="button" id="sortDrop" data-bs-toggle="dropdown" aria-expanded="false">
+            Sort by: {% if sort_by == 'price' %}Lowest Price{% elif sort_by == 'delivery' %}Fastest Delivery{% elif sort_by == 'rating' %}Vendor Rating{% else %}Recommendation Score{% endif %}
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="sortDrop">
+            <li><a class="dropdown-item" href="?sort=score">Recommendation Score</a></li>
+            <li><a class="dropdown-item" href="?sort=price">Lowest Price</a></li>
+            <li><a class="dropdown-item" href="?sort=delivery">Fastest Delivery</a></li>
+            <li><a class="dropdown-item" href="?sort=rating">Vendor Rating</a></li>
+        </ul>
+    </div>
+</div>
+
+<!-- Brief summary card -->
+<div class="card card-glass border-0 p-4 mb-4 bg-white">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h5 class="fw-bold text-slate-blue mb-1">RFQ Reference: {{ rfq.rfq_number }} - {{ rfq.title }}</h5>
+            <p class="text-muted mb-0 small">Product: <strong>{{ rfq.product_name }}</strong> | Quantity Required: <strong>{{ rfq.quantity }} units</strong></p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <span class="badge bg-secondary p-2">Comparison Formula Weights: Price (50%), Delivery (30%), Rating (20%)</span>
+        </div>
+    </div>
+</div>
+
+<!-- Comparison Grid -->
+<div class="row g-4 mb-4">
+    {% for quote in quotations %}
+    <div class="col-lg-4 col-md-6">
+        <div class="card card-glass border-0 p-4 h-100 {% if quote.is_recommended %}border border-2 border-success{% endif %} bg-white position-relative">
+            
+            {% if quote.is_recommended %}
+            <span class="position-absolute top-0 start-50 translate-middle badge bg-success px-3 py-1.5 rounded-pill shadow-sm">
+                <i class="fa-solid fa-award me-1"></i> RECOMMENDED BEST VENDOR
+            </span>
+            {% endif %}
+
+            <div class="text-center mt-3 mb-4">
+                <h5 class="fw-bold text-slate-blue mb-1">{{ quote.vendor.company_name }}</h5>
+                <span class="text-muted small">{{ quote.vendor.get_category_display }}</span>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                <span class="text-secondary small">Offered Price</span>
+                <span class="fw-bold {% if quote.is_lowest_price %}text-success{% endif %}">
+                    INR {{ quote.price|floatformat:2 }}
+                    {% if quote.is_lowest_price %}<span class="badge bg-success-subtle text-success fs-10 px-1.5 py-0.5 rounded">Lowest</span>{% endif %}
+                </span>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                <span class="text-secondary small">Delivery Timeline</span>
+                <span class="fw-semibold {% if quote.is_fastest_delivery %}text-success{% endif %}">
+                    {{ quote.delivery_timeline }} days
+                    {% if quote.is_fastest_delivery %}<span class="badge bg-success-subtle text-success fs-10 px-1.5 py-0.5 rounded">Fastest</span>{% endif %}
+                </span>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <span class="text-secondary small">Vendor Rating</span>
+                <span class="fw-semibold"><i class="fa-solid fa-star text-warning me-1"></i>{{ quote.vendor.rating }}/5.00</span>
+            </div>
+
+            <!-- Scoring Breakdown -->
+            <div class="bg-light p-3 rounded mb-4">
+                <h6 class="fw-bold text-slate-blue fs-13 mb-2">Recommendation Score Computation</h6>
+                <div class="d-flex justify-content-between small text-muted mb-1">
+                    <span>Price Score (50%):</span>
+                    <span>{{ quote.price_score }} / 100.0</span>
+                </div>
+                <div class="d-flex justify-content-between small text-muted mb-1">
+                    <span>Delivery Score (30%):</span>
+                    <span>{{ quote.delivery_score }} / 100.0</span>
+                </div>
+                <div class="d-flex justify-content-between small text-muted mb-2">
+                    <span>Vendor Rating Score (20%):</span>
+                    <span>{{ quote.rating_score }} / 100.0</span>
+                </div>
+                <div class="d-flex justify-content-between fw-bold text-dark border-top pt-2">
+                    <span>Total Weighted Score:</span>
+                    <span class="text-slate-blue">{{ quote.recommendation_score }}%</span>
+                </div>
+            </div>
+
+            <div class="mt-auto">
+                {% if rfq.status == 'published' or rfq.status == 'under_review' %}
+                <a href="{% url 'approvals:submit_to_manager' rfq.pk quote.pk %}" class="btn {% if quote.is_recommended %}btn-success{% else %}btn-outline-primary{% endif %} w-100 rounded-pill py-2 fw-semibold" onclick="return confirm('Shortlist {{ quote.vendor.company_name }} and request Manager Approval?');">
+                    Select & Request Approval
+                </a>
+                {% else %}
+                <button class="btn btn-secondary w-100 rounded-pill py-2" disabled>{{ quote.get_status_display|upper }}</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

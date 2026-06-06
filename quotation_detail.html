@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VendorBridge – Procurement & Vendor Management ERP</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f8fafc;
+        }
+        .hero-section {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: white;
+            padding: 100px 0;
+            border-bottom-left-radius: 40px;
+            border-bottom-right-radius: 40px;
+        }
+        .card-feature {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 4px 25px rgba(0,0,0,0.03);
+            transition: all 0.3s ease;
+        }
+        .card-feature:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #1a365d, #2b6cb0);
+            color: white;
+            border: none;
+            border-radius: 16px;
+        }
+        .footer {
+            background-color: #0f172a;
+            color: #94a3b8;
+            padding: 40px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3">
+        <div class="container">
+            <a class="navbar-brand fw-bold fs-3" href="#"><i class="fa-solid fa-cubes text-primary me-2"></i>VendorBridge</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item"><a class="nav-link me-3 text-white" href="#about">About</a></li>
+                    <li class="nav-item"><a class="nav-link me-3 text-white" href="#features">Features</a></li>
+                    <li class="nav-item"><a class="nav-link me-3 text-white" href="#stats">Stats</a></li>
+                    <li class="nav-item"><a class="nav-link me-4 text-white" href="#contact">Contact</a></li>
+                    <li class="nav-item">
+                        <a href="{% url 'accounts:login' %}" class="btn btn-outline-light me-2 px-4 rounded-pill">Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'accounts:signup' %}" class="btn btn-primary px-4 rounded-pill">Sign Up</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="container text-center text-lg-start">
+            <div class="row align-items-center">
+                <div class="col-lg-6">
+                    <h1 class="display-3 fw-bold mb-4">Unifying Procurement & Vendor Bidding</h1>
+                    <p class="lead text-white-50 mb-5">A production-ready Enterprise Resource Planning (ERP) platform designed for seamless Request for Quotations (RFQ) publishing, smart bid comparisons, and digital automated purchasing workflows.</p>
+                    <div class="d-flex flex-wrap justify-content-center justify-content-lg-start gap-3">
+                        <a href="{% url 'accounts:signup' %}" class="btn btn-light btn-lg px-5 rounded-pill fw-semibold">Get Started</a>
+                        <a href="#about" class="btn btn-outline-light btn-lg px-5 rounded-pill">Learn More</a>
+                    </div>
+                </div>
+                <div class="col-lg-6 mt-5 mt-lg-0 text-center">
+                    <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=600&q=80" alt="ERP DashboardMock" class="img-fluid rounded-4 shadow-lg" style="max-height: 400px; object-fit: cover;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Section -->
+    <div class="container py-5 my-5" id="about">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h2 class="fw-bold mb-4">About VendorBridge</h2>
+                <p class="text-secondary mb-4">VendorBridge is a robust, modular procurement software built on Python Django. It closes the communication gap between Procurement Officers and External Vendors. Organizations can easily broadcast requests, receive structured quotes, run automatic recommendation comparisons, and execute payments in a safe, role-restricted environment.</p>
+                <div class="d-flex gap-3">
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid fa-shield-halved text-success fs-3 me-3"></i>
+                        <div>
+                            <h6 class="fw-bold mb-0">Role Secure</h6>
+                            <small class="text-muted">Strict ACL guards</small>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid fa-bolt text-warning fs-3 me-3"></i>
+                        <div>
+                            <h6 class="fw-bold mb-0">Ultra Fast</h6>
+                            <small class="text-muted">Instant PO generator</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mt-4 mt-md-0">
+                <img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=600&q=80" alt="About Image" class="img-fluid rounded-4 shadow">
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <div class="bg-light py-5" id="features">
+        <div class="container my-4">
+            <div class="text-center mb-5">
+                <h2 class="fw-bold">Key Modules & Features</h2>
+                <p class="text-muted">All-in-one suite to manage vendor acquisitions efficiently</p>
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card card-feature p-4 text-center h-100">
+                        <div class="icon-box bg-primary-subtle text-primary rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <i class="fa-solid fa-address-book fs-4"></i>
+                        </div>
+                        <h5 class="fw-bold">Vendor CRM</h5>
+                        <p class="text-secondary small">Comprehensive vendor profile onboarding with GST identification numbers, categories, ratings, and contact info.</p>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card card-feature p-4 text-center h-100">
+                        <div class="icon-box bg-success-subtle text-success rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <i class="fa-solid fa-paper-plane fs-4"></i>
+                        </div>
+                        <h5 class="fw-bold">RFQ Publishing</h5>
+                        <p class="text-secondary small">Create RFQs with customized lists, product volumes, attachments, and invite selected vendors instantly.</p>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card card-feature p-4 text-center h-100">
+                        <div class="icon-box bg-warning-subtle text-warning rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <i class="fa-solid fa-calculator fs-4"></i>
+                        </div>
+                        <h5 class="fw-bold">Bid Scoring Engine</h5>
+                        <p class="text-secondary small">Compare vendor quotations using a weighted score: 50% Price, 30% Delivery timeline, 20% Vendor Rating.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Section -->
+    <div class="container py-5 my-5" id="stats">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">VendorBridge in Numbers</h2>
+            <p class="text-muted">Procurement efficiency metric analysis</p>
+        </div>
+        <div class="row g-4 text-center">
+            <div class="col-md-3">
+                <div class="card stats-card p-4">
+                    <h1 class="display-5 fw-bold">{{ stats.vendors_count }}</h1>
+                    <p class="mb-0 text-white-50">Onboarded Vendors</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card p-4">
+                    <h1 class="display-5 fw-bold">{{ stats.rfqs_count }}</h1>
+                    <p class="mb-0 text-white-50">Active RFQs</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card p-4">
+                    <h1 class="display-5 fw-bold">{{ stats.pos_count }}</h1>
+                    <p class="mb-0 text-white-50">Purchase Orders</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card p-4">
+                    <h1 class="display-5 fw-bold">INR {{ stats.invoices_sum|floatformat:0 }}</h1>
+                    <p class="mb-0 text-white-50">Invoice Volume Processed</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Section -->
+    <div class="bg-light py-5" id="contact">
+        <div class="container my-4">
+            <div class="row align-items-center">
+                <div class="col-lg-6">
+                    <h2 class="fw-bold mb-3">Get in Touch</h2>
+                    <p class="text-secondary mb-4">Interested in integrating VendorBridge with your company's existing database or have customization needs? Reach out directly to our procurement specialists.</p>
+                    <p class="mb-1"><i class="fa-solid fa-phone me-2 text-primary"></i> +91 22 1234 5678</p>
+                    <p><i class="fa-solid fa-envelope me-2 text-primary"></i> sales@vendorbridge.local</p>
+                </div>
+                <div class="col-lg-6">
+                    <div class="card border-0 p-4 shadow-sm rounded-4">
+                        <form onsubmit="alert('Thank you! Simulated query received.'); return false;">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Full Name</label>
+                                <input type="text" class="form-control" placeholder="John Doe" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Email Address</label>
+                                <input type="email" class="form-control" placeholder="john@example.com" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Message</label>
+                                <textarea class="form-control" rows="3" placeholder="Tell us about your organization..." required></textarea>
+                            </div>
+                            <button class="btn btn-primary w-100 rounded-pill py-2" type="submit">Submit Request</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer text-center">
+        <div class="container">
+            <p class="mb-2">&copy; 2026 VendorBridge ERP. All rights reserved.</p>
+            <small>Built with Python Django & Bootstrap 5</small>
+        </div>
+    </div>
+
+</body>
+</html>

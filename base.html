@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block title %}Activity Logs – VendorBridge ERP{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h4 class="fw-bold mb-0 text-slate-blue"><i class="fa-solid fa-list-check me-2"></i>Audit Trail & Activity Logs</h4>
+</div>
+
+<!-- Filters -->
+<div class="card card-glass border-0 p-4 mb-4 bg-white">
+    <form method="GET" class="row g-3 align-items-center">
+        <div class="col-md-9">
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{% url 'analytics_app:logs' %}" class="btn btn-sm {% if not selected_action %}btn-dark{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">All Logs</a>
+                {% for code, name in action_choices %}
+                <a href="{% url 'analytics_app:logs' %}?action_type={{ code }}" class="btn btn-sm {% if selected_action == code %}btn-dark{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">{{ name }}</a>
+                {% endfor %}
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Timeline Card -->
+<div class="card card-glass border-0 p-5 bg-white">
+    <div class="timeline px-3 mt-2">
+        {% for log in logs %}
+        <div class="timeline-item {% if log.action_type == 'auth' %}success{% elif log.action_type == 'approval' %}success{% elif log.action_type == 'quote' %}success{% endif %}">
+            <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
+                <div>
+                    <span class="badge bg-secondary-subtle text-secondary px-2 py-0.5 rounded fs-11 uppercase me-2">{{ log.get_action_type_display }}</span>
+                    <strong class="text-slate-blue">{{ log.user.username|default:"System" }}</strong>
+                </div>
+                <small class="text-muted"><i class="fa-regular fa-clock me-1"></i> {{ log.timestamp|date:"Y-m-d H:i:s" }}</small>
+            </div>
+            <p class="mb-0 fs-13 text-secondary">{{ log.description }}</p>
+        </div>
+        {% empty %}
+        <div class="text-center text-muted py-5">
+            <i class="fa-solid fa-clipboard-list fs-1 mb-3"></i>
+            <h5 class="fw-bold">No Activity Logs Found</h5>
+            <p class="mb-0">Logs are registered automatically upon user transactions.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

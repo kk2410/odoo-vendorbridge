@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% block title %}Reports & Analytics – VendorBridge ERP{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h4 class="fw-bold mb-0 text-slate-blue"><i class="fa-solid fa-chart-pie me-2"></i>Reports & Advanced Analytics</h4>
+</div>
+
+<!-- Download Cards -->
+<div class="row g-4 mb-4">
+    <!-- Card 1 -->
+    <div class="col-md-4">
+        <div class="card card-glass border-0 p-4 bg-white text-center">
+            <div class="text-primary fs-3 mb-3"><i class="fa-solid fa-users-gear"></i></div>
+            <h5 class="fw-bold">Vendor Performance</h5>
+            <p class="text-muted small">Onboarded vendor ratings, active RFQ invites, and bid counts.</p>
+            <div class="d-flex justify-content-center gap-2">
+                <a href="{% url 'analytics_app:export_report_pdf' 'vendor_performance' %}" class="btn btn-sm btn-outline-dark rounded-pill px-3"><i class="fa-solid fa-file-pdf me-1"></i>PDF</a>
+                <a href="{% url 'analytics_app:export_report_csv' 'vendor_performance' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="fa-solid fa-file-csv me-1"></i>CSV</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="col-md-4">
+        <div class="card card-glass border-0 p-4 bg-white text-center">
+            <div class="text-success fs-3 mb-3"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+            <h5 class="fw-bold">Spending Analysis</h5>
+            <p class="text-muted small">Procurement spending volume grouped by vendor profiles and categories.</p>
+            <div class="d-flex justify-content-center gap-2">
+                <a href="{% url 'analytics_app:export_report_pdf' 'spending' %}" class="btn btn-sm btn-outline-dark rounded-pill px-3"><i class="fa-solid fa-file-pdf me-1"></i>PDF</a>
+                <a href="{% url 'analytics_app:export_report_csv' 'spending' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="fa-solid fa-file-csv me-1"></i>CSV</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3 -->
+    <div class="col-md-4">
+        <div class="card card-glass border-0 p-4 bg-white text-center">
+            <div class="text-info fs-3 mb-3"><i class="fa-solid fa-boxes-stacked"></i></div>
+            <h5 class="fw-bold">Procurement Summary</h5>
+            <p class="text-muted small">Status tracking overview for active Requests for Quotation (RFQs).</p>
+            <div class="d-flex justify-content-center gap-2">
+                <a href="{% url 'analytics_app:export_report_pdf' 'procurement_summary' %}" class="btn btn-sm btn-outline-dark rounded-pill px-3"><i class="fa-solid fa-file-pdf me-1"></i>PDF</a>
+                <a href="{% url 'analytics_app:export_report_csv' 'procurement_summary' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="fa-solid fa-file-csv me-1"></i>CSV</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Data and Charts -->
+<div class="row g-4 mb-4">
+    <!-- Chart 1: Spend by Category -->
+    <div class="col-md-6">
+        <div class="card card-glass border-0 p-4 bg-white">
+            <h6 class="fw-bold text-slate-blue mb-3">Procurement Spend by Vendor Category</h6>
+            <div style="position: relative; height: 260px;">
+                <canvas id="categorySpendChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart 2: RFQ Statuses -->
+    <div class="col-md-6">
+        <div class="card card-glass border-0 p-4 bg-white">
+            <h6 class="fw-bold text-slate-blue mb-3">RFQ Status Metrics Summary</h6>
+            <div style="position: relative; height: 260px;">
+                <canvas id="rfqSummaryChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-glass border-0 p-4 bg-white">
+    <h5 class="fw-bold text-slate-blue mb-3">Vendor Statistics Summary</h5>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr class="fs-12">
+                    <th>Company Name</th>
+                    <th>Category</th>
+                    <th>GST Number</th>
+                    <th>Submitted Quotes</th>
+                    <th>Awarded POs</th>
+                    <th>Rating</th>
+                </tr>
+            </thead>
+            <tbody class="fs-13">
+                {% for v in vendors %}
+                <tr>
+                    <td><a href="{% url 'vendors:vendor_detail' v.pk %}" class="fw-bold text-decoration-none text-slate-blue">{{ v.company_name }}</a></td>
+                    <td>{{ v.get_category_display }}</td>
+                    <td>{{ v.gst_number }}</td>
+                    <td>{{ v.quote_count }}</td>
+                    <td>{{ v.po_count }}</td>
+                    <td><i class="fa-solid fa-star text-warning me-1"></i><strong>{{ v.rating }}/5.00</strong></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted">No vendors onboarded.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Injected Data from views
+    const categoryLabels = {{ category_labels|safe }};
+    const categoryValues = {{ category_values|safe }};
+    const rfqLabels = {{ rfq_labels|safe }};
+    const rfqValues = {{ rfq_values|safe }};
+
+    // Category Spend Pie
+    const ctx1 = document.getElementById('categorySpendChart').getContext('2d');
+    new Chart(ctx1, {
+        type: 'pie',
+        data: {
+            labels: categoryLabels.length ? categoryLabels : ["IT", "Office Supplies", "Services"],
+            datasets: [{
+                data: categoryValues.length ? categoryValues : [3000, 1500, 4500],
+                backgroundColor: [
+                    'rgba(26, 54, 93, 0.8)',
+                    'rgba(43, 108, 176, 0.8)',
+                    'rgba(46, 204, 113, 0.8)',
+                    'rgba(241, 196, 15, 0.8)',
+                    'rgba(231, 76, 60, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    // RFQ Bar
+    const ctx2 = document.getElementById('rfqSummaryChart').getContext('2d');
+    new Chart(ctx2, {
+        type: 'bar',
+        data: {
+            labels: rfqLabels.length ? rfqLabels : ["Draft", "Published", "Under Review", "Approved"],
+            datasets: [{
+                label: 'RFQ Counts',
+                data: rfqValues.length ? rfqValues : [1, 2, 4, 3],
+                backgroundColor: 'rgba(43, 108, 176, 0.7)',
+                borderColor: 'rgba(43, 108, 176, 1)',
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}Purchase Orders – VendorBridge ERP{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h4 class="fw-bold mb-0 text-slate-blue"><i class="fa-solid fa-cart-shopping me-2"></i>Purchase Orders (POs)</h4>
+</div>
+
+<!-- Filters -->
+<div class="card card-glass border-0 p-4 mb-4 bg-white">
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'purchase_orders:po_list' %}" class="btn btn-sm {% if not selected_status %}btn-dark{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">All POs</a>
+        {% for status_code, status_name in status_choices %}
+        <a href="{% url 'purchase_orders:po_list' %}?status={{ status_code }}" class="btn btn-sm {% if selected_status == status_code %}btn-dark{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">{{ status_name }}</a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- PO Table -->
+<div class="card card-glass border-0 p-4 bg-white">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr class="fs-12">
+                    <th>PO Number</th>
+                    <th>RFQ Reference</th>
+                    <th>Vendor Company</th>
+                    <th>Value (INR)</th>
+                    <th>Created Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody class="fs-13">
+                {% for po in pos %}
+                <tr>
+                    <td><a href="{% url 'purchase_orders:po_detail' po.pk %}" class="fw-bold text-decoration-none text-slate-blue">{{ po.po_number }}</a></td>
+                    <td>{{ po.rfq.rfq_number }}</td>
+                    <td>{{ po.vendor.company_name }}</td>
+                    <td>INR {{ po.quotation.price|floatformat:2 }}</td>
+                    <td>{{ po.created_at|date:"Y-m-d" }}</td>
+                    <td>
+                        <span class="badge {% if po.status == 'accepted' or po.status == 'completed' %}badge-active{% elif po.status == 'cancelled' %}badge-inactive{% else %}badge-pending{% endif %} px-2 py-1 rounded">
+                            {{ po.get_status_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{% url 'purchase_orders:po_detail' po.pk %}" class="btn btn-sm btn-light border px-2.5 rounded-pill">View Detail</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">No Purchase Orders found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

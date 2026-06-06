@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard – VendorBridge ERP{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <!-- Stat Card 1 -->
+    <div class="col-md">
+        <div class="card card-glass border-0 p-4 h-100 bg-white">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h6 class="text-muted fw-semibold small uppercase mb-1">Total Vendors</h6>
+                    <h3 class="fw-bold mb-0 text-slate-blue">{{ total_vendors }}</h3>
+                </div>
+                <div class="bg-primary-subtle text-primary p-3 rounded-circle">
+                    <i class="fa-solid fa-handshake fs-4"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stat Card 2 -->
+    <div class="col-md">
+        <div class="card card-glass border-0 p-4 h-100 bg-white">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h6 class="text-muted fw-semibold small uppercase mb-1">Active RFQs</h6>
+                    <h3 class="fw-bold mb-0 text-slate-blue">{{ active_rfqs }}</h3>
+                </div>
+                <div class="bg-info-subtle text-info p-3 rounded-circle">
+                    <i class="fa-solid fa-file-invoice fs-4"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stat Card 3 -->
+    <div class="col-md">
+        <div class="card card-glass border-0 p-4 h-100 bg-white">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h6 class="text-muted fw-semibold small uppercase mb-1">Pending Approvals</h6>
+                    <h3 class="fw-bold mb-0 text-slate-blue">{{ pending_approvals }}</h3>
+                </div>
+                <div class="bg-warning-subtle text-warning p-3 rounded-circle">
+                    <i class="fa-solid fa-circle-check fs-4"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stat Card 4 -->
+    <div class="col-md">
+        <div class="card card-glass border-0 p-4 h-100 bg-white">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h6 class="text-muted fw-semibold small uppercase mb-1">Purchase Orders</h6>
+                    <h3 class="fw-bold mb-0 text-slate-blue">{{ purchase_orders }}</h3>
+                </div>
+                <div class="bg-success-subtle text-success p-3 rounded-circle">
+                    <i class="fa-solid fa-cart-shopping fs-4"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stat Card 5 -->
+    <div class="col-md">
+        <div class="card card-glass border-0 p-4 h-100 bg-white">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h6 class="text-muted fw-semibold small uppercase mb-1">Invoices Issued</h6>
+                    <h3 class="fw-bold mb-0 text-slate-blue">{{ total_invoices }}</h3>
+                </div>
+                <div class="bg-danger-subtle text-danger p-3 rounded-circle">
+                    <i class="fa-solid fa-receipt fs-4"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Action Buttons -->
+<div class="card card-glass border-0 p-3 mb-4 bg-white">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="fw-bold me-2 text-slate-blue"><i class="fa-solid fa-wand-magic-sparkles me-2"></i>Quick Actions:</span>
+        {% if request.user.role == 'procurement' or request.user.role == 'admin' %}
+        <a href="{% url 'rfq:rfq_create' %}" class="btn btn-primary btn-sm rounded-pill px-3"><i class="fa-solid fa-plus me-1"></i>Create RFQ</a>
+        <a href="{% url 'vendors:vendor_create' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3"><i class="fa-solid fa-user-plus me-1"></i>Add Vendor</a>
+        {% endif %}
+        <a href="{% url 'rfq:rfq_list' %}" class="btn btn-light border btn-sm rounded-pill px-3">View Active RFQs</a>
+        <a href="{% url 'invoices:invoice_list' %}" class="btn btn-light border btn-sm rounded-pill px-3">Invoices List</a>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="row g-4 mb-4">
+    <!-- Spending Analytics -->
+    <div class="col-lg-4">
+        <div class="card card-glass border-0 p-4 bg-white h-100">
+            <h6 class="fw-bold mb-3 text-slate-blue">Top Vendor Spending (INR)</h6>
+            <div style="position: relative; height:220px; width:100%">
+                <canvas id="vendorSpendingChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- RFQ Status Distribution -->
+    <div class="col-lg-4">
+        <div class="card card-glass border-0 p-4 bg-white h-100">
+            <h6 class="fw-bold mb-3 text-slate-blue">RFQ Status Breakdown</h6>
+            <div style="position: relative; height:220px; width:100%">
+                <canvas id="rfqStatusChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Procurement Trend -->
+    <div class="col-lg-4">
+        <div class="card card-glass border-0 p-4 bg-white h-100">
+            <h6 class="fw-bold mb-3 text-slate-blue">Monthly Spend Trend</h6>
+            <div style="position: relative; height:220px; width:100%">
+                <canvas id="monthlyTrendChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Tables Section -->
+<div class="row g-4">
+    <!-- Recent RFQs -->
+    <div class="col-lg-6">
+        <div class="card card-glass border-0 p-4 bg-white h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold mb-0 text-slate-blue">Recent Requests for Quotation (RFQs)</h6>
+                <a href="{% url 'rfq:rfq_list' %}" class="btn btn-link btn-sm text-decoration-none p-0">View All</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr class="fs-12">
+                            <th>RFQ Number</th>
+                            <th>Title</th>
+                            <th>Deadline</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="fs-13">
+                        {% for rfq in recent_rfqs %}
+                        <tr>
+                            <td><a href="{% url 'rfq:rfq_detail' rfq.pk %}" class="fw-bold text-decoration-none text-slate-blue">{{ rfq.rfq_number }}</a></td>
+                            <td>{{ rfq.title|truncatechars:30 }}</td>
+                            <td>{{ rfq.deadline|date:"Y-m-d" }}</td>
+                            <td><span class="badge badge-{{ rfq.status }} px-2 py-1 rounded">{{ rfq.get_status_display }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">No recent RFQs.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Invoices -->
+    <div class="col-lg-6">
+        <div class="card card-glass border-0 p-4 bg-white h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold mb-0 text-slate-blue">Recent Invoices</h6>
+                <a href="{% url 'invoices:invoice_list' %}" class="btn btn-link btn-sm text-decoration-none p-0">View All</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr class="fs-12">
+                            <th>Invoice No</th>
+                            <th>PO Reference</th>
+                            <th>Total Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="fs-13">
+                        {% for inv in recent_invoices %}
+                        <tr>
+                            <td><a href="{% url 'invoices:invoice_detail' inv.pk %}" class="fw-bold text-decoration-none text-slate-blue">{{ inv.invoice_number }}</a></td>
+                            <td>{{ inv.purchase_order.po_number }}</td>
+                            <td>INR {{ inv.total_amount|floatformat:2 }}</td>
+                            <td><span class="badge {% if inv.status == 'paid' %}badge-active{% else %}badge-pending{% endif %} px-2 py-1 rounded">{{ inv.get_status_display }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">No recent invoices.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Data injections from backend context
+    const vendorLabels = {{ vendor_labels|safe }};
+    const vendorData = {{ vendor_data|safe }};
+    const rfqLabels = {{ rfq_labels|safe }};
+    const rfqData = {{ rfq_data|safe }};
+    const trendLabels = {{ trend_labels|safe }};
+    const trendData = {{ trend_data|safe }};
+
+    // Spending chart setup
+    const ctx1 = document.getElementById('vendorSpendingChart').getContext('2d');
+    new Chart(ctx1, {
+        type: 'bar',
+        data: {
+            labels: vendorLabels.length ? vendorLabels : ["Alpha Ltd", "Beta Corp", "Gamma LLC"],
+            datasets: [{
+                label: 'Spend volume (INR)',
+                data: vendorData.length ? vendorData : [30000, 45000, 20000],
+                backgroundColor: 'rgba(43, 108, 176, 0.7)',
+                borderColor: 'rgba(43, 108, 176, 1)',
+                borderWidth: 1,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+
+    // Status breakdown chart setup
+    const ctx2 = document.getElementById('rfqStatusChart').getContext('2d');
+    new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: rfqLabels.length ? rfqLabels : ["Draft", "Published", "Closed"],
+            datasets: [{
+                data: rfqData.length ? rfqData : [2, 5, 1],
+                backgroundColor: [
+                    'rgba(113, 128, 150, 0.7)',
+                    'rgba(49, 130, 206, 0.7)',
+                    'rgba(47, 133, 90, 0.7)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    // Trend chart setup
+    const ctx3 = document.getElementById('monthlyTrendChart').getContext('2d');
+    new Chart(ctx3, {
+        type: 'line',
+        data: {
+            labels: trendLabels.length ? trendLabels : ["Jan", "Feb", "Mar", "Apr", "May"],
+            datasets: [{
+                label: 'Fulfillment volume (INR)',
+                data: trendData.length ? trendData : [12000, 19000, 15000, 25000, 32000],
+                backgroundColor: 'rgba(46, 204, 113, 0.2)',
+                borderColor: 'rgba(46, 204, 113, 1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+</script>
+{% endblock %}
