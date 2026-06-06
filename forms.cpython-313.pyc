@@ -1,139 +1,160 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from accounts.decorators import role_required, procurement_required
-from .models import RFQ
-from .forms import RFQForm
+from accounts.decorators import role_required, vendor_required
+from rfq.models import RFQ
 from vendors.models import Vendor
-from quotations.models import Quotation
+from .models import Quotation
+from .forms import QuotationForm
 from analytics_app.models import log_activity
 from notifications_app.models import create_notification
 
 @login_required
-def rfq_list(request):
-    user = request.user
-    if user.role == 'vendor':
-        try:
-            vendor = user.vendor_profile
-            # Vendors see only published/under review RFQs assigned to them
-            rfqs = RFQ.objects.filter(assigned_vendors=vendor).exclude(status='draft')
-        except Vendor.DoesNotExist:
-            rfqs = RFQ.objects.none()
-    else:
-        rfqs = RFQ.objects.all().order_by('-created_at')
+@vendor_required
+def submit_quotation(request, rfq_id):
+    rfq = get_object_or_404(RFQ, pk=rfq_id)
+    
+    # Verify the vendor is assigned to the RFQ
+    try:
+        vendor = request.user.vendor_profile
+    except Vendor.DoesNotExist:
+        messages.error(request, "You do not have a vendor profile created.")
+        return redirect('dashboard')
 
-    # Quick filter
-    status = request.GET.get('status')
-    if status:
-        rfqs = rfqs.filter(status=status)
+    if vendor not in rfq.assigned_vendors.all():
+        messages.error(request, "You are not assigned to this RFQ.")
+        return redirect('dashboard')
+
+    if rfq.status != 'published':
+        messages.error(request, "This RFQ is not accepting submissions at this time.")
+        return redirect('rfq:rfq_detail', pk=rfq_id)
+
+    # Check if already submitted
+    existing_quote = Quotation.objects.filter(rfq=rfq, vendor=vendor).first()
+    if existing_quote:
+        messages.info(request, "You have already submitted a quotation. You can edit it instead.")
+        return redirect('quotations:quotation_detail', pk=existing_quote.pk)
+
+    if request.method == 'POST':
+        form = QuotationForm(request.POST)
+        if form.is_valid():
+            quote = form.save(commit=False)
+            quote.rfq = rfq
+            quote.vendor = vendor
+            quote.save()
+            
+            # Update RFQ status to Under Review if we want, or keep it published
+            if rfq.status == 'published':
+                rfq.status = 'under_review'
+                rfq.save()
+                
+            messages.success(request, "Quotation submitted successfully.")
+            log_activity(request.user, 'quote', f"Submitted quote for RFQ {rfq.rfq_number}. Price: {quote.price}")
+            
+            # Notify procurement officer
+            if rfq.created_by:
+                create_notification(
+                    user=rfq.created_by,
+                    title="Quotation Submitted",
+                    message=f"Vendor {vendor.company_name} submitted a quotation for RFQ {rfq.rfq_number}."
+                )
+            
+            return redirect('rfq:rfq_detail', pk=rfq_id)
+    else:
+        form = QuotationForm()
+
+    return render(request, 'quotations/quotation_form.html', {'form': form, 'rfq': rfq, 'action': 'Submit'})
+
+@login_required
+@vendor_required
+def edit_quotation(request, pk):
+    quote = get_object_or_404(Quotation, pk=pk)
+    
+    # Verify owner
+    if quote.vendor.user != request.user:
+        messages.error(request, "You are not authorized to edit this quotation.")
+        return redirect('dashboard')
+
+    if quote.rfq.status not in ['published', 'under_review']:
+        messages.error(request, "This RFQ is no longer open for revisions.")
+        return redirect('rfq:rfq_detail', pk=quote.rfq.pk)
+
+    if request.method == 'POST':
+        form = QuotationForm(request.POST, instance=quote)
+        if form.is_valid():
+            quote = form.save()
+            messages.success(request, "Quotation updated successfully.")
+            log_activity(request.user, 'quote', f"Updated quote for RFQ {quote.rfq.rfq_number}. New Price: {quote.price}")
+            return redirect('rfq:rfq_detail', pk=quote.rfq.pk)
+    else:
+        form = QuotationForm(instance=quote)
+
+    return render(request, 'quotations/quotation_form.html', {'form': form, 'rfq': quote.rfq, 'action': 'Edit', 'quote': quote})
+
+@login_required
+def quotation_detail(request, pk):
+    quote = get_object_or_404(Quotation, pk=pk)
+    user = request.user
+    
+    # If vendor, must be their own
+    if user.role == 'vendor' and quote.vendor.user != user:
+        messages.error(request, "Access denied.")
+        return redirect('dashboard')
+        
+    return render(request, 'quotations/quotation_detail.html', {'quote': quote})
+
+@login_required
+@role_required(['procurement', 'manager', 'admin'])
+def compare_quotations(request, rfq_id):
+    rfq = get_object_or_404(RFQ, pk=rfq_id)
+    quotations = list(rfq.quotations.all())
+
+    if not quotations:
+        messages.warning(request, "No quotations submitted yet for this RFQ.")
+        return redirect('rfq:rfq_detail', pk=rfq_id)
+
+    # Perform Best Vendor Scoring Calculations
+    min_price = min(q.price for q in quotations)
+    min_delivery = min(q.delivery_timeline for q in quotations)
+    
+    for q in quotations:
+        # Avoid division by zero
+        price_score = float((min_price / q.price) * 100) if q.price > 0 else 0.0
+        delivery_score = float((min_delivery / q.delivery_timeline) * 100) if q.delivery_timeline > 0 else 0.0
+        rating_score = float((q.vendor.rating / 5) * 100)
+        
+        # Calculate weighted score
+        q.price_score = round(price_score, 1)
+        q.delivery_score = round(delivery_score, 1)
+        q.rating_score = round(rating_score, 1)
+        
+        q.recommendation_score = round((price_score * 0.5) + (delivery_score * 0.3) + (rating_score * 0.2), 1)
+        
+        # Flag if lowest price or fastest delivery
+        q.is_lowest_price = (q.price == min_price)
+        q.is_fastest_delivery = (q.delivery_timeline == min_delivery)
+
+    # Sorting
+    sort_by = request.GET.get('sort', 'score')
+    if sort_by == 'price':
+        quotations.sort(key=lambda x: x.price)
+    elif sort_by == 'delivery':
+        quotations.sort(key=lambda x: x.delivery_timeline)
+    elif sort_by == 'rating':
+        quotations.sort(key=lambda x: x.vendor.rating, reverse=True)
+    else:  # score
+        quotations.sort(key=lambda x: x.recommendation_score, reverse=True)
+
+    # Best recommendation is the first one sorted by score
+    best_quote = max(quotations, key=lambda x: x.recommendation_score)
+    for q in quotations:
+        q.is_recommended = (q.pk == best_quote.pk)
 
     context = {
-        'rfqs': rfqs,
-        'status_choices': RFQ.STATUS_CHOICES,
-        'selected_status': status,
+        'rfq': rfq,
+        'quotations': quotations,
+        'min_price': min_price,
+        'min_delivery': min_delivery,
+        'sort_by': sort_by,
     }
-    return render(request, 'rfq/rfq_list.html', context)
-
-@login_required
-def rfq_detail(request, pk):
-    user = request.user
-    if user.role == 'vendor':
-        vendor = get_object_or_404(Vendor, user=user)
-        rfq = get_object_or_404(RFQ, pk=pk, assigned_vendors=vendor)
-        # Check if vendor already submitted quotation
-        user_quotation = Quotation.objects.filter(rfq=rfq, vendor=vendor).first()
-        context = {
-    'rfq': rfq,
-    'user_quotation': user_quotation,
-    'quotations': rfq.quotations.all(),
-}
-    else:
-        rfq = get_object_or_404(RFQ, pk=pk)
-        quotations = rfq.quotations.all()
-        approvals = rfq.approvals.all().order_by('-action_date')
-        context = {
-            'rfq': rfq,
-            'quotations': quotations,
-            'approvals': approvals,
-        }
-    return render(request, 'rfq/rfq_detail.html', context)
-
-@login_required
-@procurement_required
-def rfq_create(request):
-    if request.method == 'POST':
-        form = RFQForm(request.POST, request.FILES)
-        if form.is_valid():
-            rfq = form.save(commit=False)
-            rfq.created_by = request.user
-            rfq.save()
-            form.save_m2m() # Save Many-to-Many vendors
-            
-            messages.success(request, f"RFQ {rfq.rfq_number} created in draft state.")
-            log_activity(request.user, 'rfq', f"Created RFQ {rfq.rfq_number} (ID: {rfq.pk}).")
-            
-            # If status is published on creation, notify vendors
-            if rfq.status == 'published':
-                for vendor in rfq.assigned_vendors.all():
-                    if vendor.user:
-                        create_notification(
-                            user=vendor.user,
-                            title="New RFQ Invited",
-                            message=f"You have been invited to submit a quote for RFQ: {rfq.rfq_number} - {rfq.title}. Deadline is {rfq.deadline}."
-                        )
-            
-            return redirect('rfq:rfq_list')
-    else:
-        form = RFQForm()
-    return render(request, 'rfq/rfq_form.html', {'form': form, 'action': 'Create'})
-
-@login_required
-@procurement_required
-def rfq_update(request, pk):
-    rfq = get_object_or_404(RFQ, pk=pk)
-    if rfq.status in ['approved', 'po_generated']:
-        messages.error(request, "Approved/Completed RFQs cannot be edited.")
-        return redirect('rfq:rfq_detail', pk=pk)
-
-    if request.method == 'POST':
-        form = RFQForm(request.POST, request.FILES, instance=rfq)
-        if form.is_valid():
-            rfq = form.save()
-            messages.success(request, f"RFQ {rfq.rfq_number} updated.")
-            log_activity(request.user, 'rfq', f"Updated RFQ {rfq.rfq_number}.")
-            return redirect('rfq:rfq_detail', pk=pk)
-    else:
-        form = RFQForm(instance=rfq)
-    return render(request, 'rfq/rfq_form.html', {'form': form, 'action': 'Edit', 'rfq': rfq})
-
-@login_required
-@procurement_required
-def rfq_delete(request, pk):
-    rfq = get_object_or_404(RFQ, pk=pk)
-    rfq_number = rfq.rfq_number
-    rfq.delete()
-    messages.success(request, f"RFQ {rfq_number} deleted.")
-    log_activity(request.user, 'rfq', f"Deleted RFQ {rfq_number}.")
-    return redirect('rfq:rfq_list')
-
-@login_required
-@procurement_required
-def publish_rfq(request, pk):
-    rfq = get_object_or_404(RFQ, pk=pk)
-    if rfq.status == 'draft':
-        rfq.status = 'published'
-        rfq.save()
-        messages.success(request, f"RFQ {rfq.rfq_number} has been published and vendors are notified.")
-        log_activity(request.user, 'rfq', f"Published RFQ {rfq.rfq_number}.")
-        
-        # Send in-app notification to all assigned vendors
-        for vendor in rfq.assigned_vendors.all():
-            if vendor.user:
-                create_notification(
-                    user=vendor.user,
-                    title="New RFQ Invited",
-                    message=f"You have been invited to submit a quote for RFQ: {rfq.rfq_number} - {rfq.title}. Deadline: {rfq.deadline}."
-                )
-    else:
-        messages.error(request, "Only draft RFQs can be published.")
-    return redirect('rfq:rfq_detail', pk=pk)
+    return render(request, 'quotations/quotation_comparison.html', context)

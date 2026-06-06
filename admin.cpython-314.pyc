@@ -1,13 +1,11 @@
 from django.urls import path
 from . import views
 
-app_name = 'rfq'
+app_name = 'quotations'
 
 urlpatterns = [
-    path('', views.rfq_list, name='rfq_list'),
-    path('create/', views.rfq_create, name='rfq_create'),
-    path('<int:pk>/', views.rfq_detail, name='rfq_detail'),
-    path('<int:pk>/edit/', views.rfq_update, name='rfq_update'),
-    path('<int:pk>/delete/', views.rfq_delete, name='rfq_delete'),
-    path('<int:pk>/publish/', views.publish_rfq, name='publish_rfq'),
+    path('submit/<int:rfq_id>/', views.submit_quotation, name='submit_quotation'),
+    path('<int:pk>/edit/', views.edit_quotation, name='edit_quotation'),
+    path('<int:pk>/', views.quotation_detail, name='quotation_detail'),
+    path('compare/<int:rfq_id>/', views.compare_quotations, name='compare_quotations'),
 ]

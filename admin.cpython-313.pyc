@@ -1,44 +1,25 @@
 from django.db import models
-from django.conf import settings
+from rfq.models import RFQ
 from vendors.models import Vendor
-import datetime
 
-class RFQ(models.Model):
+class Quotation(models.Model):
     STATUS_CHOICES = (
-        ('draft', 'Draft'),
-        ('published', 'Published'),
-        ('under_review', 'Under Review'),
-        ('pending_approval', 'Pending Approval'),
-        ('approved', 'Approved'),
+        ('submitted', 'Submitted'),
+        ('shortlisted', 'Shortlisted'),
+        ('selected', 'Selected'),
         ('rejected', 'Rejected'),
-        ('po_generated', 'PO Generated'),
     )
 
-    rfq_number = models.CharField(max_length=20, unique=True, blank=True)
-    title = models.CharField(max_length=150)
-    description = models.TextField()
-    product_name = models.CharField(max_length=150)
-    quantity = models.PositiveIntegerField()
-    attachment = models.FileField(upload_to='rfq_attachments/', blank=True, null=True)
-    deadline = models.DateField()
-    assigned_vendors = models.ManyToManyField(Vendor, related_name='rfqs')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
-    
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_rfqs')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    rfq = models.ForeignKey(RFQ, on_delete=models.CASCADE, related_name='quotations')
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='quotations')
+    price = models.DecimalField(max_digits=12, decimal_places=2)
+    delivery_timeline = models.PositiveIntegerField(help_text="Estimated delivery time in days")
+    notes = models.TextField(blank=True, null=True)
+    submission_date = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='submitted')
 
-    def save(self, *args, **kwargs):
-        if not self.rfq_number:
-            year = datetime.date.today().year
-            last_rfq = RFQ.objects.filter(rfq_number__startswith=f'RFQ-{year}-').order_by('id').last()
-            if last_rfq:
-                last_number = int(last_rfq.rfq_number.split('-')[-1])
-                new_number = last_number + 1
-            else:
-                new_number = 1
-            self.rfq_number = f'RFQ-{year}-{new_number:04d}'
-        super().save(*args, **kwargs)
+    class Meta:
+        unique_together = ('rfq', 'vendor')
 
     def __str__(self):
-        return f"{self.rfq_number} - {self.title}"
+        return f"Quote from {self.vendor.company_name} for {self.rfq.rfq_number} - {self.price}"
