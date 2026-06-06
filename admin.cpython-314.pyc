@@ -1,11 +1,10 @@
 from django.urls import path
 from . import views
 
-app_name = 'quotations'
+app_name = 'notifications_app'
 
 urlpatterns = [
-    path('submit/<int:rfq_id>/', views.submit_quotation, name='submit_quotation'),
-    path('<int:pk>/edit/', views.edit_quotation, name='edit_quotation'),
-    path('<int:pk>/', views.quotation_detail, name='quotation_detail'),
-    path('compare/<int:rfq_id>/', views.compare_quotations, name='compare_quotations'),
+    path('', views.notification_list, name='notification_list'),
+    path('mark-read/<int:pk>/', views.mark_as_read, name='mark_as_read'),
+    path('mark-all-read/', views.mark_all_read, name='mark_all_read'),
 ]

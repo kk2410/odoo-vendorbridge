@@ -1,12 +1,12 @@
-from django import forms
-from .models import Quotation
-
-class QuotationForm(forms.ModelForm):
-    class Meta:
-        model = Quotation
-        fields = ['price', 'delivery_timeline', 'notes']
-        widgets = {
-            'price': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 5000.00', 'min': '0.01'}),
-            'delivery_timeline': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 10', 'min': '1'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Optional notes, terms, etc.'}),
+def notifications(request):
+    if request.user.is_authenticated:
+        unread_notifications = request.user.notifications.filter(is_read=False)[:5]
+        unread_count = request.user.notifications.filter(is_read=False).count()
+        return {
+            'unread_notifications': unread_notifications,
+            'unread_notifications_count': unread_count
         }
+    return {
+        'unread_notifications': [],
+        'unread_notifications_count': 0
+    }

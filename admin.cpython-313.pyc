@@ -1,25 +1,29 @@
 from django.db import models
-from rfq.models import RFQ
-from vendors.models import Vendor
+from django.conf import settings
 
-class Quotation(models.Model):
-    STATUS_CHOICES = (
-        ('submitted', 'Submitted'),
-        ('shortlisted', 'Shortlisted'),
-        ('selected', 'Selected'),
-        ('rejected', 'Rejected'),
+class Notification(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='notifications'
     )
-
-    rfq = models.ForeignKey(RFQ, on_delete=models.CASCADE, related_name='quotations')
-    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='quotations')
-    price = models.DecimalField(max_digits=12, decimal_places=2)
-    delivery_timeline = models.PositiveIntegerField(help_text="Estimated delivery time in days")
-    notes = models.TextField(blank=True, null=True)
-    submission_date = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='submitted')
+    title = models.CharField(max_length=150)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('rfq', 'vendor')
+        ordering = ['-created_at']
 
     def __str__(self):
-        return f"Quote from {self.vendor.company_name} for {self.rfq.rfq_number} - {self.price}"
+        return f"Notification for {self.user.username} - {self.title}"
+
+def create_notification(user, title, message):
+    """
+    Utility function to create a notification for a user.
+    """
+    Notification.objects.create(
+        user=user,
+        title=title,
+        message=message
+    )
