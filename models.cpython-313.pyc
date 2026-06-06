@@ -1,0 +1,119 @@
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from accounts.decorators import role_required, procurement_required, vendor_required
+from rfq.models import RFQ
+from quotations.models import Quotation
+from vendors.models import Vendor
+from .models import PurchaseOrder
+from analytics_app.models import log_activity
+from notifications_app.models import create_notification
+
+@login_required
+@procurement_required
+def generate_purchase_order(request, rfq_id):
+    rfq = get_object_or_404(RFQ, pk=rfq_id)
+    if rfq.status != 'approved':
+        messages.error(request, "A Purchase Order can only be generated for approved RFQs.")
+        return redirect('rfq:rfq_detail', pk=rfq_id)
+
+    # Check if PO already exists
+    if PurchaseOrder.objects.filter(rfq=rfq).exists():
+        messages.warning(request, "Purchase Order already exists for this RFQ.")
+        return redirect('purchase_orders:po_list')
+
+    # Find the selected quotation
+    selected_quote = rfq.quotations.filter(status='selected').first()
+    if not selected_quote:
+        messages.error(request, "No selected quotation found for this RFQ.")
+        return redirect('rfq:rfq_detail', pk=rfq_id)
+
+    # Create PO
+    po = PurchaseOrder.objects.create(
+        rfq=rfq,
+        quotation=selected_quote,
+        vendor=selected_quote.vendor,
+        status='draft'
+    )
+
+    # Update RFQ status
+    rfq.status = 'po_generated'
+    rfq.save()
+
+    messages.success(request, f"Purchase Order {po.po_number} generated successfully as Draft.")
+    log_activity(request.user, 'po', f"Generated Purchase Order {po.po_number} for RFQ {rfq.rfq_number}.")
+
+    # Notify Vendor
+    if po.vendor.user:
+        create_notification(
+            user=po.vendor.user,
+            title="Purchase Order Issued",
+            message=f"Purchase Order {po.po_number} has been issued to you. Please review and accept."
+        )
+
+    return redirect('purchase_orders:po_detail', pk=po.pk)
+
+@login_required
+def po_list(request):
+    user = request.user
+    if user.role == 'vendor':
+        try:
+            vendor = user.vendor_profile
+            pos = PurchaseOrder.objects.filter(vendor=vendor).order_by('-created_at')
+        except Vendor.DoesNotExist:
+            pos = PurchaseOrder.objects.none()
+    else:
+        pos = PurchaseOrder.objects.all().order_by('-created_at')
+
+    # Status filters
+    status = request.GET.get('status')
+    if status:
+        pos = pos.filter(status=status)
+
+    context = {
+        'pos': pos,
+        'status_choices': PurchaseOrder.STATUS_CHOICES,
+        'selected_status': status,
+    }
+    return render(request, 'purchase_orders/po_list.html', context)
+
+@login_required
+def po_detail(request, pk):
+    po = get_object_or_404(PurchaseOrder, pk=pk)
+    user = request.user
+
+    # Vendor can only see their own PO
+    if user.role == 'vendor' and po.vendor.user != user:
+        messages.error(request, "Access denied.")
+        return redirect('dashboard')
+
+    context = {
+        'po': po,
+    }
+    return render(request, 'purchase_orders/po_detail.html', context)
+
+@login_required
+@vendor_required
+def accept_po(request, pk):
+    po = get_object_or_404(PurchaseOrder, pk=pk)
+    if po.vendor.user != request.user:
+        messages.error(request, "Access denied.")
+        return redirect('dashboard')
+
+    if po.status == 'draft':
+        po.status = 'accepted'
+        po.save()
+        messages.success(request, f"Purchase Order {po.po_number} accepted.")
+        log_activity(request.user, 'po', f"Accepted Purchase Order {po.po_number}.")
+
+        # Notify Procurement Officer
+        if po.rfq.created_by:
+            create_notification(
+                user=po.rfq.created_by,
+                title="Purchase Order Accepted",
+                message=f"Vendor {po.vendor.company_name} accepted Purchase Order {po.po_number}."
+            )
+    else:
+        messages.info(request, f"Purchase Order {po.po_number} is already {po.get_status_display()}.")
+
+    return redirect('purchase_orders:po_detail', pk=pk)

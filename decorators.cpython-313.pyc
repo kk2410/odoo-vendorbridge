@@ -1,0 +1,162 @@
+from django.shortcuts import render, redirect
+from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from .forms import CustomUserCreationForm
+from django.contrib.auth import get_user_model
+from django.db.models import Sum, Count
+
+from vendors.models import Vendor
+from rfq.models import RFQ
+from quotations.models import Quotation
+from approvals.models import Approval
+from purchase_orders.models import PurchaseOrder
+from invoices.models import Invoice
+from analytics_app.models import ActivityLog, log_activity
+
+User = get_user_model()
+
+def landing(request):
+    if request.user.is_authenticated:
+        return redirect('accounts:dashboard')
+    
+    # Static facts for landing page statistics
+    stats = {
+        'vendors_count': Vendor.objects.count() + 12, # mock + actual for vibrant look
+        'rfqs_count': RFQ.objects.count() + 45,
+        'pos_count': PurchaseOrder.objects.count() + 32,
+        'invoices_sum': Invoice.objects.aggregate(total=Sum('total_amount'))['total'] or 125400.00,
+    }
+    return render(request, 'landing.html', {'stats': stats})
+
+def signup_view(request):
+    if request.user.is_authenticated:
+        return redirect('accounts:dashboard')
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            messages.success(request, "Registration successful! You can now log in.")
+            log_activity(user, 'auth', f"New user {user.username} registered with role {user.role}.")
+            return redirect('accounts:login')
+        else:
+            messages.error(request, "Registration failed. Please correct the errors below.")
+    else:
+        form = CustomUserCreationForm()
+    return render(request, 'accounts/signup.html', {'form': form})
+
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('accounts:dashboard')
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=username, password=password)
+            if user is not None:
+                login(request, user)
+                messages.success(request, f"Welcome back, {user.first_name or user.username}!")
+                log_activity(user, 'auth', f"User {user.username} logged in successfully.")
+                return redirect('accounts:dashboard')
+            else:
+                messages.error(request, "Invalid username or password.")
+        else:
+            messages.error(request, "Invalid username or password.")
+    else:
+        form = AuthenticationForm()
+    return render(request, 'accounts/login.html', {'form': form})
+
+def logout_view(request):
+    if request.user.is_authenticated:
+        log_activity(request.user, 'auth', f"User {request.user.username} logged out.")
+        logout(request)
+        messages.info(request, "You have been logged out.")
+    return redirect('accounts:landing')
+
+def forgot_password_view(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        messages.success(request, f"If an account exists for {email}, a password reset link has been simulated to your console!")
+        return redirect('accounts:login')
+    return render(request, 'accounts/forgot_password.html')
+
+@login_required
+def dashboard(request):
+    user = request.user
+    
+    # Calculate counters based on role
+    if user.is_vendor_role():
+        try:
+            vendor_profile = user.vendor_profile
+        except Vendor.DoesNotExist:
+            # Handle edge case where vendor profile wasn't created
+            vendor_profile = None
+
+        if vendor_profile:
+            total_vendors = Vendor.objects.count()
+            active_rfqs = RFQ.objects.filter(assigned_vendors=vendor_profile, status='published').count()
+            pending_approvals = 0  # Vendors don't manage approvals
+            purchase_orders = PurchaseOrder.objects.filter(vendor=vendor_profile).count()
+            total_invoices = Invoice.objects.filter(purchase_order__vendor=vendor_profile).count()
+            
+            recent_rfqs = RFQ.objects.filter(assigned_vendors=vendor_profile, status='published').order_by('-created_at')[:5]
+            recent_quotations = Quotation.objects.filter(vendor=vendor_profile).order_by('-submission_date')[:5]
+            recent_invoices = Invoice.objects.filter(purchase_order__vendor=vendor_profile).order_by('-created_at')[:5]
+        else:
+            total_vendors = active_rfqs = pending_approvals = purchase_orders = total_invoices = 0
+            recent_rfqs = recent_quotations = recent_invoices = []
+    else:
+        # Admin, Procurement, Manager
+        total_vendors = Vendor.objects.count()
+        active_rfqs = RFQ.objects.exclude(status__in=['draft', 'po_generated', 'rejected']).count()
+        pending_approvals = Approval.objects.filter(status='pending').count()
+        purchase_orders = PurchaseOrder.objects.count()
+        total_invoices = Invoice.objects.count()
+        
+        recent_rfqs = RFQ.objects.all().order_by('-created_at')[:5]
+        recent_quotations = Quotation.objects.all().order_by('-submission_date')[:5]
+        recent_invoices = Invoice.objects.all().order_by('-created_at')[:5]
+
+    # Chart Analytics (Construct arrays for Chart.js)
+    # 1. RFQ status distribution
+    rfq_statuses = list(RFQ.objects.values('status').annotate(count=Count('id')))
+    rfq_labels = [dict(RFQ.STATUS_CHOICES).get(s['status'], s['status']) for s in rfq_statuses]
+    rfq_data = [s['count'] for s in rfq_statuses]
+
+    # 2. Spending Analytics: top 5 vendors with highest PO count or invoice sum
+    vendor_spending = list(Invoice.objects.values('purchase_order__vendor__company_name')
+                           .annotate(total_spent=Sum('total_amount'))
+                           .order_by('-total_spent')[:5])
+    vendor_labels = [vs['purchase_order__vendor__company_name'] or "Unknown" for vs in vendor_spending]
+    vendor_data = [float(vs['total_spent'] or 0) for vs in vendor_spending]
+
+    # 3. Monthly Invoice Trend (last 6 months)
+    # Simplify for development using database dates
+    monthly_trend = list(Invoice.objects.values('created_at__month')
+                         .annotate(total=Sum('total_amount'))
+                         .order_by('created_at__month')[:6])
+    months_map = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun', 7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
+    trend_labels = [months_map.get(m['created_at__month'], str(m['created_at__month'])) for m in monthly_trend]
+    trend_data = [float(m['total'] or 0) for m in monthly_trend]
+
+    context = {
+        'total_vendors': total_vendors,
+        'active_rfqs': active_rfqs,
+        'pending_approvals': pending_approvals,
+        'purchase_orders': purchase_orders,
+        'total_invoices': total_invoices,
+        'recent_rfqs': recent_rfqs,
+        'recent_quotations': recent_quotations,
+        'recent_invoices': recent_invoices,
+        
+        # Chart Data
+        'rfq_labels': rfq_labels,
+        'rfq_data': rfq_data,
+        'vendor_labels': vendor_labels,
+        'vendor_data': vendor_data,
+        'trend_labels': trend_labels,
+        'trend_data': trend_data,
+    }
+    return render(request, 'dashboard.html', context)

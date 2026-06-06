@@ -1,0 +1,37 @@
+from django.db import models
+from rfq.models import RFQ
+from quotations.models import Quotation
+from vendors.models import Vendor
+import datetime
+
+class PurchaseOrder(models.Model):
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('sent', 'Sent to Vendor'),
+        ('accepted', 'Accepted by Vendor'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    po_number = models.CharField(max_length=20, unique=True, blank=True)
+    rfq = models.ForeignKey(RFQ, on_delete=models.CASCADE, related_name='purchase_orders')
+    quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name='purchase_orders')
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='purchase_orders')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.po_number:
+            year = datetime.date.today().year
+            last_po = PurchaseOrder.objects.filter(po_number__startswith=f'PO-{year}-').order_by('id').last()
+            if last_po:
+                last_number = int(last_po.po_number.split('-')[-1])
+                new_number = last_number + 1
+            else:
+                new_number = 1
+            self.po_number = f'PO-{year}-{new_number:04d}'
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.po_number} - {self.vendor.company_name}"
