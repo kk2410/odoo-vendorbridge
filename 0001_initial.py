@@ -1,18 +1,24 @@
 from django import forms
-from .models import Vendor
+from .models import RFQ
+from vendors.models import Vendor
 
-class VendorForm(forms.ModelForm):
+class RFQForm(forms.ModelForm):
+    assigned_vendors = forms.ModelMultipleChoiceField(
+        queryset=Vendor.objects.filter(status='active'),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        required=True,
+        help_text="Select one or more active vendors to receive this RFQ."
+    )
+
     class Meta:
-        model = Vendor
-        fields = ['company_name', 'category', 'gst_number', 'contact_person', 'email', 'phone_number', 'address', 'rating', 'status']
+        model = RFQ
+        fields = ['title', 'description', 'product_name', 'quantity', 'deadline', 'attachment', 'assigned_vendors', 'status']
         widgets = {
-            'company_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'category': forms.Select(attrs={'class': 'form-select'}),
-            'gst_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'contact_person': forms.TextInput(attrs={'class': 'form-control'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'rating': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.00', 'max': '5.00', 'step': '0.01'}),
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'product_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'deadline': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'attachment': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
         }

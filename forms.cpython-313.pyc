@@ -1,36 +1,139 @@
-from django.db import models
-from django.conf import settings
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from accounts.decorators import role_required, procurement_required
+from .models import RFQ
+from .forms import RFQForm
+from vendors.models import Vendor
+from quotations.models import Quotation
+from analytics_app.models import log_activity
+from notifications_app.models import create_notification
 
-class Vendor(models.Model):
-    CATEGORY_CHOICES = (
-        ('it', 'IT & Software'),
-        ('office', 'Office Supplies'),
-        ('logistics', 'Logistics & Shipping'),
-        ('services', 'Professional Services'),
-        ('mfg', 'Manufacturing & Raw Materials'),
-    )
-    
-    STATUS_CHOICES = (
-        ('active', 'Active'),
-        ('inactive', 'Inactive'),
-    )
+@login_required
+def rfq_list(request):
+    user = request.user
+    if user.role == 'vendor':
+        try:
+            vendor = user.vendor_profile
+            # Vendors see only published/under review RFQs assigned to them
+            rfqs = RFQ.objects.filter(assigned_vendors=vendor).exclude(status='draft')
+        except Vendor.DoesNotExist:
+            rfqs = RFQ.objects.none()
+    else:
+        rfqs = RFQ.objects.all().order_by('-created_at')
 
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
-        related_name='vendor_profile',
-        null=True, 
-        blank=True
-    )
-    company_name = models.CharField(max_length=150, unique=True)
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='office')
-    gst_number = models.CharField(max_length=15, unique=True)
-    contact_person = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
-    phone_number = models.CharField(max_length=15)
-    address = models.TextField()
-    rating = models.DecimalField(max_digits=3, decimal_places=2, default=5.00)  # scale 0.00 to 5.00
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
+    # Quick filter
+    status = request.GET.get('status')
+    if status:
+        rfqs = rfqs.filter(status=status)
 
-    def __str__(self):
-        return f"{self.company_name} - {self.get_category_display()}"
+    context = {
+        'rfqs': rfqs,
+        'status_choices': RFQ.STATUS_CHOICES,
+        'selected_status': status,
+    }
+    return render(request, 'rfq/rfq_list.html', context)
+
+@login_required
+def rfq_detail(request, pk):
+    user = request.user
+    if user.role == 'vendor':
+        vendor = get_object_or_404(Vendor, user=user)
+        rfq = get_object_or_404(RFQ, pk=pk, assigned_vendors=vendor)
+        # Check if vendor already submitted quotation
+        user_quotation = Quotation.objects.filter(rfq=rfq, vendor=vendor).first()
+        context = {
+    'rfq': rfq,
+    'user_quotation': user_quotation,
+    'quotations': rfq.quotations.all(),
+}
+    else:
+        rfq = get_object_or_404(RFQ, pk=pk)
+        quotations = rfq.quotations.all()
+        approvals = rfq.approvals.all().order_by('-action_date')
+        context = {
+            'rfq': rfq,
+            'quotations': quotations,
+            'approvals': approvals,
+        }
+    return render(request, 'rfq/rfq_detail.html', context)
+
+@login_required
+@procurement_required
+def rfq_create(request):
+    if request.method == 'POST':
+        form = RFQForm(request.POST, request.FILES)
+        if form.is_valid():
+            rfq = form.save(commit=False)
+            rfq.created_by = request.user
+            rfq.save()
+            form.save_m2m() # Save Many-to-Many vendors
+            
+            messages.success(request, f"RFQ {rfq.rfq_number} created in draft state.")
+            log_activity(request.user, 'rfq', f"Created RFQ {rfq.rfq_number} (ID: {rfq.pk}).")
+            
+            # If status is published on creation, notify vendors
+            if rfq.status == 'published':
+                for vendor in rfq.assigned_vendors.all():
+                    if vendor.user:
+                        create_notification(
+                            user=vendor.user,
+                            title="New RFQ Invited",
+                            message=f"You have been invited to submit a quote for RFQ: {rfq.rfq_number} - {rfq.title}. Deadline is {rfq.deadline}."
+                        )
+            
+            return redirect('rfq:rfq_list')
+    else:
+        form = RFQForm()
+    return render(request, 'rfq/rfq_form.html', {'form': form, 'action': 'Create'})
+
+@login_required
+@procurement_required
+def rfq_update(request, pk):
+    rfq = get_object_or_404(RFQ, pk=pk)
+    if rfq.status in ['approved', 'po_generated']:
+        messages.error(request, "Approved/Completed RFQs cannot be edited.")
+        return redirect('rfq:rfq_detail', pk=pk)
+
+    if request.method == 'POST':
+        form = RFQForm(request.POST, request.FILES, instance=rfq)
+        if form.is_valid():
+            rfq = form.save()
+            messages.success(request, f"RFQ {rfq.rfq_number} updated.")
+            log_activity(request.user, 'rfq', f"Updated RFQ {rfq.rfq_number}.")
+            return redirect('rfq:rfq_detail', pk=pk)
+    else:
+        form = RFQForm(instance=rfq)
+    return render(request, 'rfq/rfq_form.html', {'form': form, 'action': 'Edit', 'rfq': rfq})
+
+@login_required
+@procurement_required
+def rfq_delete(request, pk):
+    rfq = get_object_or_404(RFQ, pk=pk)
+    rfq_number = rfq.rfq_number
+    rfq.delete()
+    messages.success(request, f"RFQ {rfq_number} deleted.")
+    log_activity(request.user, 'rfq', f"Deleted RFQ {rfq_number}.")
+    return redirect('rfq:rfq_list')
+
+@login_required
+@procurement_required
+def publish_rfq(request, pk):
+    rfq = get_object_or_404(RFQ, pk=pk)
+    if rfq.status == 'draft':
+        rfq.status = 'published'
+        rfq.save()
+        messages.success(request, f"RFQ {rfq.rfq_number} has been published and vendors are notified.")
+        log_activity(request.user, 'rfq', f"Published RFQ {rfq.rfq_number}.")
+        
+        # Send in-app notification to all assigned vendors
+        for vendor in rfq.assigned_vendors.all():
+            if vendor.user:
+                create_notification(
+                    user=vendor.user,
+                    title="New RFQ Invited",
+                    message=f"You have been invited to submit a quote for RFQ: {rfq.rfq_number} - {rfq.title}. Deadline: {rfq.deadline}."
+                )
+    else:
+        messages.error(request, "Only draft RFQs can be published.")
+    return redirect('rfq:rfq_detail', pk=pk)
