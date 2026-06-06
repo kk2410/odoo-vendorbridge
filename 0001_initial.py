@@ -1,12 +1,18 @@
 from django import forms
-from .models import Quotation
+from .models import Vendor
 
-class QuotationForm(forms.ModelForm):
+class VendorForm(forms.ModelForm):
     class Meta:
-        model = Quotation
-        fields = ['price', 'delivery_timeline', 'notes']
+        model = Vendor
+        fields = ['company_name', 'category', 'gst_number', 'contact_person', 'email', 'phone_number', 'address', 'rating', 'status']
         widgets = {
-            'price': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 5000.00', 'min': '0.01'}),
-            'delivery_timeline': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 10', 'min': '1'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Optional notes, terms, etc.'}),
+            'company_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
+            'gst_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'contact_person': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'rating': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.00', 'max': '5.00', 'step': '0.01'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
         }

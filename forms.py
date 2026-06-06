@@ -1,8 +1,8 @@
 from django.contrib import admin
-from .models import Quotation
+from .models import Vendor
 
-@admin.register(Quotation)
-class QuotationAdmin(admin.ModelAdmin):
-    list_display = ['rfq', 'vendor', 'price', 'delivery_timeline', 'status', 'submission_date']
-    list_filter = ['status']
-    search_fields = ['rfq__rfq_number', 'vendor__company_name']
+@admin.register(Vendor)
+class VendorAdmin(admin.ModelAdmin):
+    list_display = ['company_name', 'category', 'gst_number', 'contact_person', 'email', 'rating', 'status']
+    list_filter = ['category', 'status']
+    search_fields = ['company_name', 'contact_person', 'email']

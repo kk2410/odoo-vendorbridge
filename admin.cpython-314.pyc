@@ -1,11 +1,12 @@
 from django.urls import path
 from . import views
 
-app_name = 'purchase_orders'
+app_name = 'vendors'
 
 urlpatterns = [
-    path('', views.po_list, name='po_list'),
-    path('generate/<int:rfq_id>/', views.generate_purchase_order, name='generate_purchase_order'),
-    path('<int:pk>/', views.po_detail, name='po_detail'),
-    path('<int:pk>/accept/', views.accept_po, name='accept_po'),
+    path('', views.vendor_list, name='vendor_list'),
+    path('<int:pk>/', views.vendor_detail, name='vendor_detail'),
+    path('create/', views.vendor_create, name='vendor_create'),
+    path('<int:pk>/edit/', views.vendor_update, name='vendor_update'),
+    path('<int:pk>/delete/', views.vendor_delete, name='vendor_delete'),
 ]

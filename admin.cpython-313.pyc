@@ -1,37 +1,36 @@
 from django.db import models
-from rfq.models import RFQ
-from quotations.models import Quotation
-from vendors.models import Vendor
-import datetime
+from django.conf import settings
 
-class PurchaseOrder(models.Model):
+class Vendor(models.Model):
+    CATEGORY_CHOICES = (
+        ('it', 'IT & Software'),
+        ('office', 'Office Supplies'),
+        ('logistics', 'Logistics & Shipping'),
+        ('services', 'Professional Services'),
+        ('mfg', 'Manufacturing & Raw Materials'),
+    )
+    
     STATUS_CHOICES = (
-        ('draft', 'Draft'),
-        ('sent', 'Sent to Vendor'),
-        ('accepted', 'Accepted by Vendor'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
     )
 
-    po_number = models.CharField(max_length=20, unique=True, blank=True)
-    rfq = models.ForeignKey(RFQ, on_delete=models.CASCADE, related_name='purchase_orders')
-    quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name='purchase_orders')
-    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='purchase_orders')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def save(self, *args, **kwargs):
-        if not self.po_number:
-            year = datetime.date.today().year
-            last_po = PurchaseOrder.objects.filter(po_number__startswith=f'PO-{year}-').order_by('id').last()
-            if last_po:
-                last_number = int(last_po.po_number.split('-')[-1])
-                new_number = last_number + 1
-            else:
-                new_number = 1
-            self.po_number = f'PO-{year}-{new_number:04d}'
-        super().save(*args, **kwargs)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='vendor_profile',
+        null=True, 
+        blank=True
+    )
+    company_name = models.CharField(max_length=150, unique=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='office')
+    gst_number = models.CharField(max_length=15, unique=True)
+    contact_person = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+    phone_number = models.CharField(max_length=15)
+    address = models.TextField()
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=5.00)  # scale 0.00 to 5.00
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
 
     def __str__(self):
-        return f"{self.po_number} - {self.vendor.company_name}"
+        return f"{self.company_name} - {self.get_category_display()}"
